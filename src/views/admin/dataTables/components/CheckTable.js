@@ -41,14 +41,16 @@ import {
 import Card from 'components/card/Card';
 import Menu from 'components/menu/MainMenu';
 import { MdEdit, MdDelete, MdAdd } from 'react-icons/md';
+import { useDataContext } from 'contexts/DataContext';
 
 const columnHelper = createColumnHelper();
 
 // const columns = columnsDataCheck;
 export default function CheckTable(props) {
   const { tableData } = props;
+  const { tablesData, updateCheckTable } = useDataContext();
   const [sorting, setSorting] = React.useState([]);
-  const [data, setData] = React.useState(() => [...(tableData || [])]);
+  const [data, setData] = React.useState(() => [...(tablesData.check || [])]);
   const [editingRow, setEditingRow] = React.useState(null);
   const [formData, setFormData] = React.useState({});
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -65,6 +67,7 @@ export default function CheckTable(props) {
     const newData = [...data];
     newData.splice(index, 1);
     setData(newData);
+    updateCheckTable(newData);
   };
 
   const handleAdd = () => {
@@ -74,13 +77,15 @@ export default function CheckTable(props) {
   };
 
   const handleSave = () => {
+    let newData;
     if (editingRow !== null) {
-      const newData = [...data];
+      newData = [...data];
       newData[editingRow] = formData;
-      setData(newData);
     } else {
-      setData([...data, formData]);
+      newData = [...data, formData];
     }
+    setData(newData);
+    updateCheckTable(newData);
     onClose();
   };
   const columns = [

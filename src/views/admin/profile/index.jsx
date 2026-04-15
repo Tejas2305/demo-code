@@ -21,22 +21,34 @@
 */
 
 // Chakra imports
-import { Box, Grid } from "@chakra-ui/react";
+import { Box, Grid, useDisclosure } from "@chakra-ui/react";
 
 // Custom components
 import Banner from "views/admin/profile/components/Banner";
 import General from "views/admin/profile/components/General";
 import Notifications from "views/admin/profile/components/Notifications";
 import Projects from "views/admin/profile/components/Projects";
+import ProjectsGrid from "views/admin/profile/components/ProjectsGrid";
 import Storage from "views/admin/profile/components/Storage";
 import Upload from "views/admin/profile/components/Upload";
+import ProfileEditModal from "views/admin/profile/components/ProfileEditModal";
 
 // Assets
 import banner from "assets/img/auth/banner.png";
 import avatar from "assets/img/avatars/avatar4.png";
-import React from "react";
+import React, { useState } from "react";
+import { useDataContext } from "contexts/DataContext";
 
 export default function Overview() {
+  const { tablesData, updateProfile } = useDataContext();
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  const [profileData, setProfileData] = useState(tablesData.profile);
+
+  const handleProfileSave = (newData) => {
+    setProfileData(newData);
+    updateProfile(newData);
+    onClose();
+  };
   return (
     <Box pt={{ base: "130px", md: "80px", xl: "80px" }}>
       {/* Main Fields */}
@@ -54,11 +66,12 @@ export default function Overview() {
           gridArea='1 / 1 / 2 / 2'
           banner={banner}
           avatar={avatar}
-          name='Adela Parkson'
-          job='Product Designer'
-          posts='17'
-          followers='9.7k'
-          following='274'
+          name={profileData.name}
+          job={profileData.job}
+          posts={profileData.posts}
+          followers={profileData.followers}
+          following={profileData.following}
+          onEdit={onOpen}
         />
         <Storage
           gridArea={{ base: "2 / 1 / 3 / 2", lg: "1 / 2 / 2 / 3" }}
@@ -113,6 +126,16 @@ export default function Overview() {
           }}
         />
       </Grid>
+      {/* Projects Grid Gallery */}
+      <Box mt="20px">
+        <ProjectsGrid />
+      </Box>
+      <ProfileEditModal
+        isOpen={isOpen}
+        onClose={onClose}
+        profileData={profileData}
+        onSave={handleProfileSave}
+      />
     </Box>
   );
 }

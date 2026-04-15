@@ -1,10 +1,11 @@
 // Chakra imports
-import { Avatar, Box, Flex, Text, useColorModeValue } from "@chakra-ui/react";
+import { Avatar, Box, Flex, Text, useColorModeValue, Button, Icon } from "@chakra-ui/react";
 import Card from "components/card/Card.js";
 import React from "react";
+import { MdEdit } from "react-icons/md";
 
 export default function Banner(props) {
-  const { banner, avatar, name, job, posts, followers, following } = props;
+  const { banner, avatar, name, job, posts, followers, following, onEdit } = props;
   // Chakra Color Mode
   const textColorPrimary = useColorModeValue("secondaryGray.900", "white");
   const textColorSecondary = "gray.400";
@@ -62,6 +63,15 @@ export default function Banner(props) {
           </Text>
         </Flex>
       </Flex>
+      <Button
+        leftIcon={<Icon as={MdEdit} />}
+        colorScheme="brand"
+        size="sm"
+        mt="20px"
+        onClick={onEdit}
+      >
+        Edit Profile
+      </Button>
     </Card>
   );
 }

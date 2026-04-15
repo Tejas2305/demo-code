@@ -41,14 +41,16 @@ import Menu from 'components/menu/MainMenu';
 import { AndroidLogo, AppleLogo, WindowsLogo } from 'components/icons/Icons';
 import * as React from 'react';
 import { MdEdit, MdDelete, MdAdd } from 'react-icons/md';
+import { useDataContext } from 'contexts/DataContext';
 
 const columnHelper = createColumnHelper();
 
 // const columns = columnsDataCheck;
 export default function ComplexTable(props) {
   const { tableData } = props;
+  const { tablesData, updateDevelopmentTable } = useDataContext();
   const [sorting, setSorting] = React.useState([]);
-  const [data, setData] = React.useState(() => [...(tableData || [])]);
+  const [data, setData] = React.useState(() => [...(tablesData.development || [])]);
   const [editingRow, setEditingRow] = React.useState(null);
   const [formData, setFormData] = React.useState({});
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -65,6 +67,7 @@ export default function ComplexTable(props) {
     const newData = [...data];
     newData.splice(index, 1);
     setData(newData);
+    updateDevelopmentTable(newData);
   };
 
   const handleAdd = () => {
@@ -74,13 +77,15 @@ export default function ComplexTable(props) {
   };
 
   const handleSave = () => {
+    let newData;
     if (editingRow !== null) {
-      const newData = [...data];
+      newData = [...data];
       newData[editingRow] = formData;
-      setData(newData);
     } else {
-      setData([...data, formData]);
+      newData = [...data, formData];
     }
+    setData(newData);
+    updateDevelopmentTable(newData);
     onClose();
   };
   const iconColor = useColorModeValue('secondaryGray.500', 'white');

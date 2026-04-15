@@ -40,14 +40,16 @@ import Menu from 'components/menu/MainMenu';
 import * as React from 'react';
 // Assets
 import { MdCancel, MdCheckCircle, MdOutlineError, MdEdit, MdDelete, MdAdd } from 'react-icons/md';
+import { useDataContext } from 'contexts/DataContext';
 
 const columnHelper = createColumnHelper();
 
 // const columns = columnsDataCheck;
 export default function ComplexTable(props) {
   const { tableData } = props;
+  const { tablesData, updateComplexTable } = useDataContext();
   const [sorting, setSorting] = React.useState([]);
-  const [data, setData] = React.useState(() => [...(tableData || [])]);
+  const [data, setData] = React.useState(() => [...(tablesData.complex || [])]);
   const [editingRow, setEditingRow] = React.useState(null);
   const [formData, setFormData] = React.useState({});
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -64,6 +66,7 @@ export default function ComplexTable(props) {
     const newData = [...data];
     newData.splice(index, 1);
     setData(newData);
+    updateComplexTable(newData);
   };
 
   const handleAdd = () => {
@@ -73,13 +76,15 @@ export default function ComplexTable(props) {
   };
 
   const handleSave = () => {
+    let newData;
     if (editingRow !== null) {
-      const newData = [...data];
+      newData = [...data];
       newData[editingRow] = formData;
-      setData(newData);
     } else {
-      setData([...data, formData]);
+      newData = [...data, formData];
     }
+    setData(newData);
+    updateComplexTable(newData);
     onClose();
   };
   const columns = [
