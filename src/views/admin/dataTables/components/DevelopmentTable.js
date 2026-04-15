@@ -111,8 +111,8 @@ export default function ComplexTable(props) {
         </Flex>
       ),
     }),
-    columnHelper.accessor('tech', {
-      id: 'tech',
+    columnHelper.accessor('platform', {
+      id: 'platform',
       header: () => (
         <Text
           justifyContent="space-between"
@@ -120,40 +120,53 @@ export default function ComplexTable(props) {
           fontSize={{ sm: '10px', lg: '12px' }}
           color="gray.400"
         >
-          STATUS
+          PLATFORM
         </Text>
       ),
-      cell: (info) => (
-        <Flex align="center">
-          {info.getValue().map((item, key) => {
-            if (item === 'apple') {
+      cell: (info) => {
+        const value = info.getValue();
+        const platforms = Array.isArray(value) ? value : [value].filter(Boolean);
+
+        return (
+          <Flex align="center">
+            {platforms.map((item, key) => {
+              const normalized = (item || '').toString().toLowerCase();
+              if (normalized.includes('apple') || normalized.includes('mac')) {
+                return (
+                  <AppleLogo
+                    key={key}
+                    color={iconColor}
+                    me="16px"
+                    h="18px"
+                    w="15px"
+                  />
+                );
+              }
+              if (normalized.includes('android')) {
+                return (
+                  <AndroidLogo
+                    key={key}
+                    color={iconColor}
+                    me="16px"
+                    h="18px"
+                    w="16px"
+                  />
+                );
+              }
+              if (normalized.includes('windows')) {
+                return (
+                  <WindowsLogo key={key} color={iconColor} h="18px" w="19px" />
+                );
+              }
               return (
-                <AppleLogo
-                  key={key}
-                  color={iconColor}
-                  me="16px"
-                  h="18px"
-                  w="15px"
-                />
+                <Text key={key} color={textColor} fontSize="sm" fontWeight="700">
+                  {item}
+                </Text>
               );
-            } else if (item === 'android') {
-              return (
-                <AndroidLogo
-                  key={key}
-                  color={iconColor}
-                  me="16px"
-                  h="18px"
-                  w="16px"
-                />
-              );
-            } else if (item === 'windows') {
-              return (
-                <WindowsLogo key={key} color={iconColor} h="18px" w="19px" />
-              );
-            }
-          })}
-        </Flex>
-      ),
+            })}
+          </Flex>
+        );
+      },
     }),
     columnHelper.accessor('date', {
       id: 'date',
@@ -200,7 +213,7 @@ export default function ComplexTable(props) {
         </Flex>
       ),
     }),
-    columnHelper.accessor('actions', {
+    columnHelper.display({
       id: 'actions',
       header: () => (
         <Text

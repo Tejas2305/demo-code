@@ -193,7 +193,7 @@ export default function ComplexTable(props) {
         </Flex>
       ),
     }),
-    columnHelper.accessor('actions', {
+    columnHelper.display({
       id: 'actions',
       header: () => (
         <Text

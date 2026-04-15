@@ -5,8 +5,10 @@ import React from "react";
 import { useDropzone } from "react-dropzone";
 
 function Dropzone(props) {
-  const { content, ...rest } = props;
-  const { getRootProps, getInputProps } = useDropzone();
+  const { content, onDrop, ...rest } = props;
+  const { getRootProps, getInputProps } = useDropzone({
+    onDrop: onDrop,
+  });
   const bg = useColorModeValue("gray.100", "navy.700");
   const borderColor = useColorModeValue("secondaryGray.100", "whiteAlpha.100");
   return (

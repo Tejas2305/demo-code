@@ -161,7 +161,7 @@ export default function ColumnTable(props) {
         </Text>
       ),
     }),
-    columnHelper.accessor('actions', {
+    columnHelper.display({
       id: 'actions',
       header: () => (
         <Text

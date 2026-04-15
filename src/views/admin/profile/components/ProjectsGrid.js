@@ -9,15 +9,18 @@ import {
   Icon,
   Flex,
   Badge,
+  useDisclosure,
 } from "@chakra-ui/react";
-import React from "react";
+import React, { useState } from "react";
 import { MdEdit, MdDelete } from "react-icons/md";
 import Card from "components/card/Card.js";
 import { useDataContext } from "contexts/DataContext";
+import DataEditModal from "./DataEditModal";
 
 export default function ProjectsGrid() {
   const { tablesData, updateComplexTable, updateCheckTable, updateDevelopmentTable, updateColumnsTable } = useDataContext();
-  const [editingItem, setEditingItem] = React.useState(null);
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  const [editingItem, setEditingItem] = useState(null);
   const textColorPrimary = useColorModeValue("secondaryGray.900", "white");
   const textColorSecondary = "gray.400";
   const cardBg = useColorModeValue("white", "gray.700");
@@ -30,6 +33,11 @@ export default function ProjectsGrid() {
     ...tablesData.development.map((item, idx) => ({ ...item, type: "Development", originalIndex: idx, tableType: "development" })),
     ...tablesData.columns.map((item, idx) => ({ ...item, type: "Columns", originalIndex: idx, tableType: "columns" })),
   ];
+
+  const handleEdit = (item) => {
+    setEditingItem(item);
+    onOpen();
+  };
 
   const handleDelete = (item) => {
     if (item.tableType === "complex") {
@@ -45,6 +53,30 @@ export default function ProjectsGrid() {
       const newData = tablesData.columns.filter((_, idx) => idx !== item.originalIndex);
       updateColumnsTable(newData);
     }
+  };
+
+  const handleSave = (updatedData) => {
+    if (!editingItem) return;
+    
+    if (editingItem.tableType === "complex") {
+      const newData = [...tablesData.complex];
+      newData[editingItem.originalIndex] = updatedData;
+      updateComplexTable(newData);
+    } else if (editingItem.tableType === "check") {
+      const newData = [...tablesData.check];
+      newData[editingItem.originalIndex] = updatedData;
+      updateCheckTable(newData);
+    } else if (editingItem.tableType === "development") {
+      const newData = [...tablesData.development];
+      newData[editingItem.originalIndex] = updatedData;
+      updateDevelopmentTable(newData);
+    } else if (editingItem.tableType === "columns") {
+      const newData = [...tablesData.columns];
+      newData[editingItem.originalIndex] = updatedData;
+      updateColumnsTable(newData);
+    }
+    
+    onClose();
   };
 
   return (
@@ -183,7 +215,7 @@ export default function ProjectsGrid() {
                 variant="ghost"
                 leftIcon={<Icon as={MdEdit} w="18px" h="18px" />}
                 colorScheme="brand"
-                onClick={() => setEditingItem(item)}
+                onClick={() => handleEdit(item)}
               >
                 Edit
               </Button>
@@ -200,6 +232,15 @@ export default function ProjectsGrid() {
           </ChakraCard>
         ))}
       </Grid>
+      
+      {editingItem && (
+        <DataEditModal
+          isOpen={isOpen}
+          onClose={onClose}
+          editingItem={editingItem}
+          onSave={handleSave}
+        />
+      )}
     </Card>
   );
 }

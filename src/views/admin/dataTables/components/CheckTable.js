@@ -168,7 +168,7 @@ export default function CheckTable(props) {
         </Text>
       ),
     }),
-    columnHelper.accessor('actions', {
+    columnHelper.display({
       id: 'actions',
       header: () => (
         <Text
