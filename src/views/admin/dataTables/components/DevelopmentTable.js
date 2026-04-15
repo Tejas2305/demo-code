@@ -3,8 +3,21 @@
 
 import {
   Box,
+  Button,
   Flex,
+  FormControl,
+  FormLabel,
+  Icon,
+  Input,
+  Modal,
+  ModalBody,
+  ModalCloseButton,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+  ModalOverlay,
   Progress,
+  Select,
   Table,
   Tbody,
   Td,
@@ -13,6 +26,7 @@ import {
   Thead,
   Tr,
   useColorModeValue,
+  useDisclosure,
 } from '@chakra-ui/react';
 import {
   createColumnHelper,
@@ -26,7 +40,7 @@ import Card from 'components/card/Card';
 import Menu from 'components/menu/MainMenu';
 import { AndroidLogo, AppleLogo, WindowsLogo } from 'components/icons/Icons';
 import * as React from 'react';
-// Assets
+import { MdEdit, MdDelete, MdAdd } from 'react-icons/md';
 
 const columnHelper = createColumnHelper();
 
@@ -34,9 +48,42 @@ const columnHelper = createColumnHelper();
 export default function ComplexTable(props) {
   const { tableData } = props;
   const [sorting, setSorting] = React.useState([]);
+  const [data, setData] = React.useState(() => [...(tableData || [])]);
+  const [editingRow, setEditingRow] = React.useState(null);
+  const [formData, setFormData] = React.useState({});
+  const { isOpen, onOpen, onClose } = useDisclosure();
   const textColor = useColorModeValue('secondaryGray.900', 'white');
-  const iconColor = useColorModeValue('secondaryGray.500', 'white');
   const borderColor = useColorModeValue('gray.200', 'whiteAlpha.100');
+
+  const handleEdit = (row) => {
+    setEditingRow(row.index);
+    setFormData({ ...row.original });
+    onOpen();
+  };
+
+  const handleDelete = (index) => {
+    const newData = [...data];
+    newData.splice(index, 1);
+    setData(newData);
+  };
+
+  const handleAdd = () => {
+    setEditingRow(null);
+    setFormData({ name: '', platform: 'Windows', progress: 0, date: '' });
+    onOpen();
+  };
+
+  const handleSave = () => {
+    if (editingRow !== null) {
+      const newData = [...data];
+      newData[editingRow] = formData;
+      setData(newData);
+    } else {
+      setData([...data, formData]);
+    }
+    onClose();
+  };
+  const iconColor = useColorModeValue('secondaryGray.500', 'white');
   let defaultData = tableData;
   const columns = [
     columnHelper.accessor('name', {
@@ -148,8 +195,41 @@ export default function ComplexTable(props) {
         </Flex>
       ),
     }),
+    columnHelper.accessor('actions', {
+      id: 'actions',
+      header: () => (
+        <Text
+          justifyContent="space-between"
+          align="center"
+          fontSize={{ sm: '10px', lg: '12px' }}
+          color="gray.400"
+        >
+          ACTIONS
+        </Text>
+      ),
+      cell: (info) => (
+        <Flex align="center">
+          <Icon
+            as={MdEdit}
+            w="20px"
+            h="20px"
+            me="10px"
+            color="brand.500"
+            cursor="pointer"
+            onClick={() => handleEdit(info.row)}
+          />
+          <Icon
+            as={MdDelete}
+            w="20px"
+            h="20px"
+            color="red.500"
+            cursor="pointer"
+            onClick={() => handleDelete(info.row.index)}
+          />
+        </Flex>
+      ),
+    }),
   ];
-  const [data, setData] = React.useState(() => [...defaultData]);
   const table = useReactTable({
     data,
     columns,
@@ -162,12 +242,13 @@ export default function ComplexTable(props) {
     debugTable: true,
   });
   return (
-    <Card
-      flexDirection="column"
-      w="100%"
-      px="0px"
-      overflowX={{ sm: 'scroll', lg: 'hidden' }}
-    >
+    <>
+      <Card
+        flexDirection="column"
+        w="100%"
+        px="0px"
+        overflowX={{ sm: 'scroll', lg: 'hidden' }}
+      >
       <Flex px="25px" mb="8px" justifyContent="space-between" align="center">
         <Text
           color={textColor}
@@ -177,7 +258,18 @@ export default function ComplexTable(props) {
         >
           Development Table
         </Text>
-        <Menu />
+        <Flex align="center">
+          <Button
+            leftIcon={<Icon as={MdAdd} />}
+            colorScheme="brand"
+            size="sm"
+            onClick={handleAdd}
+            me="10px"
+          >
+            Add New
+          </Button>
+          <Menu />
+        </Flex>
       </Flex>
       <Box>
         <Table variant="simple" color="gray.500" mb="24px" mt="12px">
@@ -244,5 +336,58 @@ export default function ComplexTable(props) {
         </Table>
       </Box>
     </Card>
+
+    {/* CRUD Modal */}
+    <Modal isOpen={isOpen} onClose={onClose}>
+      <ModalOverlay />
+      <ModalContent>
+        <ModalHeader>{editingRow !== null ? 'Edit Record' : 'Add Record'}</ModalHeader>
+        <ModalCloseButton />
+        <ModalBody>
+          <FormControl mb="4">
+            <FormLabel>Name</FormLabel>
+            <Input
+              value={formData.name || ''}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="Name"
+            />
+          </FormControl>
+          <FormControl mb="4">
+            <FormLabel>Platform</FormLabel>
+            <Input
+              value={formData.platform || ''}
+              onChange={(e) => setFormData({ ...formData, platform: e.target.value })}
+              placeholder="Platform"
+            />
+          </FormControl>
+          <FormControl mb="4">
+            <FormLabel>Progress</FormLabel>
+            <Input
+              type="number"
+              value={formData.progress || 0}
+              onChange={(e) => setFormData({ ...formData, progress: Number(e.target.value) })}
+              placeholder="0-100"
+            />
+          </FormControl>
+          <FormControl mb="4">
+            <FormLabel>Date</FormLabel>
+            <Input
+              type="date"
+              value={formData.date || ''}
+              onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+            />
+          </FormControl>
+        </ModalBody>
+        <ModalFooter>
+          <Button colorScheme="brand" mr={3} onClick={handleSave}>
+            Save
+          </Button>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+        </ModalFooter>
+      </ModalContent>
+    </Modal>
+    </>
   );
 }
