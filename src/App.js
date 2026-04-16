@@ -11,6 +11,7 @@ import {
 import initialTheme from './theme/theme'; //  { themeGreen }
 import { useState } from 'react';
 import { DataProvider } from './contexts/DataContext';
+import { MonitoringProvider } from './contexts/MonitoringContext';
 // Chakra imports
 
 export default function Main() {
@@ -19,7 +20,8 @@ export default function Main() {
   return (
     <ChakraProvider theme={currentTheme}>
       <DataProvider>
-        <Routes>
+        <MonitoringProvider>
+          <Routes>
           <Route path="auth/*" element={<AuthLayout />} />
           <Route
             path="admin/*"
@@ -35,6 +37,7 @@ export default function Main() {
         />
         <Route path="/" element={<Navigate to="/admin" replace />} />
         </Routes>
+        </MonitoringProvider>
       </DataProvider>
     </ChakraProvider>
   );
