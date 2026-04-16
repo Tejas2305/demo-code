@@ -33,20 +33,20 @@ const defaultTablesData = {
 export const DataProvider = ({ children }) => {
   const [tablesData, setTablesData] = useState(() => {
     try {
-      const saved = localStorage.getItem('tablesData');
+      const saved = sessionStorage.getItem('tablesData');
       return saved ? JSON.parse(saved) : defaultTablesData;
     } catch (error) {
-      console.error('Error loading data from localStorage:', error);
+      console.error('Error loading data from sessionStorage:', error);
       return defaultTablesData;
     }
   });
 
-  // Save to localStorage whenever data changes
+  // Save to sessionStorage whenever data changes (resets on server restart/browser session end)
   useEffect(() => {
     try {
-      localStorage.setItem('tablesData', JSON.stringify(tablesData));
+      sessionStorage.setItem('tablesData', JSON.stringify(tablesData));
     } catch (error) {
-      console.error('Error saving data to localStorage:', error);
+      console.error('Error saving data to sessionStorage:', error);
     }
   }, [tablesData]);
 

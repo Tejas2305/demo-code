@@ -23,9 +23,9 @@ export default function Upload(props) {
   const { tablesData, updateProfile } = useDataContext();
   const [uploadedImages, setUploadedImages] = useState([]);
 
-  // Load images from localStorage on mount
+  // Load images from sessionStorage on mount
   useEffect(() => {
-    const savedImages = localStorage.getItem('profileImages');
+    const savedImages = sessionStorage.getItem('profileImages');
     if (savedImages) {
       try {
         setUploadedImages(JSON.parse(savedImages));
@@ -54,8 +54,8 @@ export default function Upload(props) {
         };
         const updatedImages = [...uploadedImages, newImage];
         setUploadedImages(updatedImages);
-        // Save to localStorage
-        localStorage.setItem('profileImages', JSON.stringify(updatedImages));
+        // Save to sessionStorage
+        sessionStorage.setItem('profileImages', JSON.stringify(updatedImages));
       };
       reader.readAsDataURL(file);
     });
@@ -64,7 +64,7 @@ export default function Upload(props) {
   const handleDeleteImage = (id) => {
     const updatedImages = uploadedImages.filter((img) => img.id !== id);
     setUploadedImages(updatedImages);
-    localStorage.setItem('profileImages', JSON.stringify(updatedImages));
+    sessionStorage.setItem('profileImages', JSON.stringify(updatedImages));
   };
 
   return (
