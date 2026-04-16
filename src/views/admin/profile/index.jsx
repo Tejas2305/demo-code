@@ -34,8 +34,8 @@ import Upload from "views/admin/profile/components/Upload";
 import ProfileEditModal from "views/admin/profile/components/ProfileEditModal";
 
 // Assets
-import banner from "assets/img/auth/banner.png";
-import avatar from "assets/img/avatars/avatar4.png";
+const banner = "https://images.unsplash.com/photo-1506765515384-028b60a970df?fm=jpg&q=60&w=3000&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D";
+const avatar = "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=200&q=80";
 import React, { useState } from "react";
 import { useDataContext } from "contexts/DataContext";
 

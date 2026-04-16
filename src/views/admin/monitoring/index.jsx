@@ -54,6 +54,10 @@ import {
   MdApi,
   MdNetworkCheck,
   MdWarning,
+  MdImage,
+  MdTextFields,
+  MdCloudQueue,
+  MdStorage,
 } from 'react-icons/md';
 import Chart from 'react-apexcharts';
 
@@ -102,7 +106,9 @@ class MonitoringErrorBoundary extends React.Component {
                 mt={4}
                 colorScheme="red"
                 variant="outline"
-                onClick={() => this.setState({ hasError: false, error: null, errorInfo: null })}
+                onClick={() =>
+                  this.setState({ hasError: false, error: null, errorInfo: null })
+                }
               >
                 Try Again
               </Button>
@@ -115,7 +121,7 @@ class MonitoringErrorBoundary extends React.Component {
   }
 }
 
-// ─── Helper: format ms ──────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────
 const fmtMs = (ms) => {
   if (ms == null || isNaN(ms)) return '—';
   if (ms < 1) return `${(ms * 1000).toFixed(0)}µs`;
@@ -123,7 +129,13 @@ const fmtMs = (ms) => {
   return `${(ms / 1000).toFixed(2)}s`;
 };
 
-// ─── Helper: status color ────────────────────────────────────────
+const fmtBytes = (bytes) => {
+  if (!bytes || bytes <= 0) return '—';
+  if (bytes < 1024) return `${bytes}B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)}MB`;
+};
+
 const statusColor = (status) => {
   if (!status || status === 0) return 'red';
   if (status >= 200 && status < 300) return 'green';
@@ -132,7 +144,6 @@ const statusColor = (status) => {
   return 'red';
 };
 
-// ─── Helper: compute percentile ──────────────────────────────────
 const percentile = (arr, p) => {
   if (!arr || arr.length === 0) return 0;
   const sorted = [...arr].sort((a, b) => a - b);
@@ -140,10 +151,23 @@ const percentile = (arr, p) => {
   return sorted[Math.max(0, idx)];
 };
 
+const RESOURCE_TYPE_META = {
+  api: { label: 'API', color: 'purple', icon: MdApi },
+  image: { label: 'Image', color: 'teal', icon: MdImage },
+  font: { label: 'Font', color: 'cyan', icon: MdTextFields },
+  cdn: { label: 'CDN', color: 'blue', icon: MdCloudQueue },
+  media: { label: 'Media', color: 'pink', icon: MdStorage },
+  other: { label: 'Other', color: 'gray', icon: MdNetworkCheck },
+  unknown: { label: 'Unknown', color: 'gray', icon: MdNetworkCheck },
+};
+
 // ─── Stat Card ───────────────────────────────────────────────────
 function StatCard({ icon, iconBg, label, value, helpText, helpColor }) {
   const textColor = useColorModeValue('secondaryGray.900', 'white');
-  const textSecondary = useColorModeValue('secondaryGray.600', 'secondaryGray.400');
+  const textSecondary = useColorModeValue(
+    'secondaryGray.600',
+    'secondaryGray.400'
+  );
 
   return (
     <Card py="18px" px="20px">
@@ -172,27 +196,85 @@ function StatCard({ icon, iconBg, label, value, helpText, helpColor }) {
   );
 }
 
+// ─── Resource Type Mini Card ─────────────────────────────────────
+function ResourceTypeCard({ type, count, avgDuration, totalSize }) {
+  const meta = RESOURCE_TYPE_META[type] || RESOURCE_TYPE_META.other;
+  const textColor = useColorModeValue('secondaryGray.900', 'white');
+  const textSecondary = useColorModeValue(
+    'secondaryGray.600',
+    'secondaryGray.400'
+  );
+  const bgColor = useColorModeValue('white', 'navy.800');
+
+  return (
+    <Card py="14px" px="16px" bg={bgColor}>
+      <Flex align="center" gap="12px">
+        <Flex
+          w="40px"
+          h="40px"
+          borderRadius="10px"
+          align="center"
+          justify="center"
+          bg={`${meta.color}.100`}
+        >
+          <Icon as={meta.icon} w="20px" h="20px" color={`${meta.color}.500`} />
+        </Flex>
+        <Box flex="1">
+          <Flex justify="space-between" align="center">
+            <Text color={textColor} fontSize="sm" fontWeight="700">
+              {meta.label}
+            </Text>
+            <Badge
+              colorScheme={meta.color}
+              borderRadius="full"
+              fontSize="xs"
+              px="8px"
+            >
+              {count}
+            </Badge>
+          </Flex>
+          <Flex gap="12px" mt="2px">
+            <Text color={textSecondary} fontSize="xs">
+              Avg: {fmtMs(avgDuration)}
+            </Text>
+            {totalSize > 0 && (
+              <Text color={textSecondary} fontSize="xs">
+                Size: {fmtBytes(totalSize)}
+              </Text>
+            )}
+          </Flex>
+        </Box>
+      </Flex>
+    </Card>
+  );
+}
+
 // ─── Main Dashboard Content ──────────────────────────────────────
 function MonitoringDashboardContent() {
-  const { requests, endpointStats, overallStats, clearLogs } =
+  const { requests, endpointStats, overallStats, resourceTypeStats, clearLogs } =
     useMonitoringContext();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [methodFilter, setMethodFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
-  const [testUrl, setTestUrl] = useState('https://jsonplaceholder.typicode.com/posts/1');
+  const [resourceTypeFilter, setResourceTypeFilter] = useState('ALL');
+  const [testUrl, setTestUrl] = useState(
+    'https://jsonplaceholder.typicode.com/posts/1'
+  );
   const [testMethod, setTestMethod] = useState('GET');
   const [isTesting, setIsTesting] = useState(false);
   const [testError, setTestError] = useState('');
 
   // ── Color tokens ──
   const textColor = useColorModeValue('secondaryGray.900', 'white');
-  const textSecondary = useColorModeValue('secondaryGray.600', 'secondaryGray.400');
+  const textSecondary = useColorModeValue(
+    'secondaryGray.600',
+    'secondaryGray.400'
+  );
   const borderColor = useColorModeValue('gray.200', 'whiteAlpha.100');
   const tableBg = useColorModeValue('white', 'navy.800');
   const hoverBg = useColorModeValue('gray.50', 'whiteAlpha.50');
   const brandColor = useColorModeValue('brand.500', 'brand.400');
-  const boxBg = useColorModeValue('secondaryGray.300', 'whiteAlpha.100');
   const cardShadow = useColorModeValue(
     '0px 18px 40px rgba(112, 144, 176, 0.12)',
     'unset'
@@ -229,34 +311,57 @@ function MonitoringDashboardContent() {
     return `${rps.toFixed(1)}/s`;
   }, [requests]);
 
+  const totalTransferred = useMemo(() => {
+    return requests.reduce((sum, r) => sum + (r.size || 0), 0);
+  }, [requests]);
+
   // ── Filtered requests ──
   const filteredRequests = useMemo(() => {
     try {
       return requests.filter((r) => {
-        if (searchTerm && !(r.url || '').toLowerCase().includes(searchTerm.toLowerCase())) {
+        if (
+          searchTerm &&
+          !(r.url || '').toLowerCase().includes(searchTerm.toLowerCase()) &&
+          !(r.rawUrl || '').toLowerCase().includes(searchTerm.toLowerCase())
+        ) {
           return false;
         }
         if (methodFilter !== 'ALL' && r.method !== methodFilter) return false;
         if (statusFilter === 'SUCCESS' && !r.success) return false;
         if (statusFilter === 'ERROR' && r.success) return false;
+        if (
+          resourceTypeFilter !== 'ALL' &&
+          r.resourceType !== resourceTypeFilter
+        )
+          return false;
         return true;
       });
     } catch {
       return requests;
     }
-  }, [requests, searchTerm, methodFilter, statusFilter]);
+  }, [requests, searchTerm, methodFilter, statusFilter, resourceTypeFilter]);
 
   // ── Filtered endpoint stats ──
   const filteredEndpoints = useMemo(() => {
     try {
-      if (!searchTerm) return endpointStats;
-      return endpointStats.filter((ep) =>
-        (ep.url || '').toLowerCase().includes(searchTerm.toLowerCase())
-      );
+      let filtered = endpointStats;
+      if (searchTerm) {
+        filtered = filtered.filter((ep) =>
+          (ep.url || '').toLowerCase().includes(searchTerm.toLowerCase())
+        );
+      }
+      if (resourceTypeFilter !== 'ALL') {
+        filtered = filtered.filter(
+          (ep) =>
+            ep.resourceTypes &&
+            ep.resourceTypes.includes(resourceTypeFilter)
+        );
+      }
+      return filtered;
     } catch {
       return endpointStats;
     }
-  }, [endpointStats, searchTerm]);
+  }, [endpointStats, searchTerm, resourceTypeFilter]);
 
   // ── Response time distribution chart ──
   const distributionChart = useMemo(() => {
@@ -265,10 +370,10 @@ function MonitoringDashboardContent() {
     }
     const buckets = [
       { label: '< 50ms', max: 50 },
-      { label: '50-100ms', max: 100 },
-      { label: '100-250ms', max: 250 },
-      { label: '250-500ms', max: 500 },
-      { label: '500ms-1s', max: 1000 },
+      { label: '50-100', max: 100 },
+      { label: '100-250', max: 250 },
+      { label: '250-500', max: 500 },
+      { label: '0.5-1s', max: 1000 },
       { label: '1-2s', max: 2000 },
       { label: '2-5s', max: 5000 },
       { label: '> 5s', max: Infinity },
@@ -288,7 +393,7 @@ function MonitoringDashboardContent() {
     };
   }, [durations]);
 
-  // ── Timeline chart (last 20 requests) ──
+  // ── Timeline chart (recent requests) ──
   const timelineChart = useMemo(() => {
     const recent = [...requests].reverse().slice(-30);
     return {
@@ -303,6 +408,19 @@ function MonitoringDashboardContent() {
       ],
     };
   }, [requests]);
+
+  // ── Resource type breakdown chart ──
+  const resourceTypePieChart = useMemo(() => {
+    if (resourceTypeStats.length === 0) {
+      return { series: [], labels: [] };
+    }
+    return {
+      series: resourceTypeStats.map((s) => s.count),
+      labels: resourceTypeStats.map(
+        (s) => (RESOURCE_TYPE_META[s.type] || RESOURCE_TYPE_META.other).label
+      ),
+    };
+  }, [resourceTypeStats]);
 
   // ── Fire a test request ──
   const fireTestRequest = useCallback(async () => {
@@ -329,20 +447,34 @@ function MonitoringDashboardContent() {
   return (
     <Box pt={{ base: '130px', md: '80px', xl: '80px' }}>
       {/* ─── Header ─── */}
-      <Flex mb="20px" justify="space-between" align="center" flexWrap="wrap" gap="10px">
+      <Flex
+        mb="20px"
+        justify="space-between"
+        align="center"
+        flexWrap="wrap"
+        gap="10px"
+      >
         <Flex align="center" gap="12px">
           <Box
             w="10px"
             h="10px"
             borderRadius="50%"
             bg={requests.length > 0 ? 'green.400' : 'gray.400'}
-            boxShadow={requests.length > 0 ? '0 0 8px rgba(72, 187, 120, 0.6)' : 'none'}
-            animation={requests.length > 0 ? 'pulse 2s ease-in-out infinite' : 'none'}
+            boxShadow={
+              requests.length > 0
+                ? '0 0 8px rgba(72, 187, 120, 0.6)'
+                : 'none'
+            }
+            animation={
+              requests.length > 0
+                ? 'pulse 2s ease-in-out infinite'
+                : 'none'
+            }
           />
           <Text color={textColor} fontSize="sm" fontWeight="500">
             {requests.length > 0
-              ? `Tracking ${requests.length} request${requests.length > 1 ? 's' : ''}`
-              : 'Waiting for API calls...'}
+              ? `Tracking ${requests.length} network request${requests.length > 1 ? 's' : ''}`
+              : 'Waiting for network activity...'}
           </Text>
         </Flex>
         <Button
@@ -358,7 +490,11 @@ function MonitoringDashboardContent() {
       </Flex>
 
       {/* ─── Overview Stat Cards ─── */}
-      <SimpleGrid columns={{ base: 1, md: 2, lg: 3, '2xl': 6 }} gap="20px" mb="20px">
+      <SimpleGrid
+        columns={{ base: 1, md: 2, lg: 3, '2xl': 6 }}
+        gap="20px"
+        mb="20px"
+      >
         <StatCard
           icon={<Icon w="28px" h="28px" as={MdApi} color="white" />}
           iconBg="linear-gradient(135deg, #868CFF 0%, #4318FF 100%)"
@@ -401,7 +537,9 @@ function MonitoringDashboardContent() {
             <Icon
               w="28px"
               h="28px"
-              as={parseFloat(errorRate) > 0 ? MdErrorOutline : MdCheckCircle}
+              as={
+                parseFloat(errorRate) > 0 ? MdErrorOutline : MdCheckCircle
+              }
               color="white"
             />
           }
@@ -416,15 +554,34 @@ function MonitoringDashboardContent() {
           value={requests.length > 0 ? `${successRate}%` : '—'}
           helpText={
             requests.length > 0
-              ? `${errorRate}% error rate`
+              ? `${errorRate}% errors · ${fmtBytes(totalTransferred)} transferred`
               : 'No data yet'
           }
           helpColor={parseFloat(errorRate) > 0 ? 'red.400' : 'green.500'}
         />
       </SimpleGrid>
 
+      {/* ─── Resource Type Breakdown Cards ─── */}
+      {resourceTypeStats.length > 0 && (
+        <SimpleGrid
+          columns={{ base: 2, md: 3, lg: 6 }}
+          gap="12px"
+          mb="20px"
+        >
+          {resourceTypeStats.map((st) => (
+            <ResourceTypeCard
+              key={st.type}
+              type={st.type}
+              count={st.count}
+              avgDuration={st.count > 0 ? st.totalDuration / st.count : 0}
+              totalSize={st.totalSize}
+            />
+          ))}
+        </SimpleGrid>
+      )}
+
       {/* ─── Charts Row ─── */}
-      <SimpleGrid columns={{ base: 1, md: 2 }} gap="20px" mb="20px">
+      <SimpleGrid columns={{ base: 1, md: 2, xl: 3 }} gap="20px" mb="20px">
         {/* Response Time Distribution */}
         <Card p="20px" boxShadow={cardShadow}>
           <Text color={textColor} fontSize="lg" fontWeight="700" mb="16px">
@@ -438,7 +595,12 @@ function MonitoringDashboardContent() {
               direction="column"
               gap="8px"
             >
-              <Icon as={MdNetworkCheck} w="40px" h="40px" color={textSecondary} />
+              <Icon
+                as={MdNetworkCheck}
+                w="40px"
+                h="40px"
+                color={textSecondary}
+              />
               <Text color={textSecondary} fontSize="sm">
                 Make some API calls to see distribution
               </Text>
@@ -473,27 +635,26 @@ function MonitoringDashboardContent() {
                 xaxis: {
                   categories: distributionChart.categories,
                   labels: {
-                    style: { fontSize: '11px' },
+                    style: { fontSize: '10px' },
                     rotate: -45,
                     rotateAlways: true,
                   },
                 },
                 yaxis: {
                   title: { text: 'Count' },
-                  labels: {
-                    formatter: (v) => Math.round(v),
-                  },
+                  labels: { formatter: (v) => Math.round(v) },
                 },
                 tooltip: {
                   y: {
-                    formatter: (v) => `${v} request${v !== 1 ? 's' : ''}`,
+                    formatter: (v) =>
+                      `${v} request${v !== 1 ? 's' : ''}`,
                   },
                 },
                 grid: { borderColor: 'rgba(0,0,0,0.05)' },
               }}
               series={distributionChart.series}
               type="bar"
-              height={280}
+              height={260}
             />
           )}
         </Card>
@@ -511,7 +672,12 @@ function MonitoringDashboardContent() {
               direction="column"
               gap="8px"
             >
-              <Icon as={MdNetworkCheck} w="40px" h="40px" color={textSecondary} />
+              <Icon
+                as={MdNetworkCheck}
+                w="40px"
+                h="40px"
+                color={textSecondary}
+              />
               <Text color={textSecondary} fontSize="sm">
                 Make some API calls to see timeline
               </Text>
@@ -537,19 +703,89 @@ function MonitoringDashboardContent() {
                 },
                 dataLabels: { enabled: false },
                 xaxis: {
-                  labels: { show: true, rotate: -45, style: { fontSize: '10px' } },
+                  labels: {
+                    show: true,
+                    rotate: -45,
+                    style: { fontSize: '9px' },
+                  },
                 },
                 yaxis: {
                   title: { text: 'ms' },
                   labels: { formatter: (v) => `${Math.round(v)}ms` },
                 },
-                tooltip: {
-                  y: { formatter: (v) => `${v}ms` },
-                },
+                tooltip: { y: { formatter: (v) => `${v}ms` } },
                 grid: { borderColor: 'rgba(0,0,0,0.05)' },
               }}
               series={timelineChart.series}
               type="area"
+              height={260}
+            />
+          )}
+        </Card>
+
+        {/* Resource Type Pie */}
+        <Card p="20px" boxShadow={cardShadow}>
+          <Text color={textColor} fontSize="lg" fontWeight="700" mb="16px">
+            Network by Resource Type
+          </Text>
+          {resourceTypePieChart.series.length === 0 ? (
+            <Flex
+              h="250px"
+              align="center"
+              justify="center"
+              direction="column"
+              gap="8px"
+            >
+              <Icon
+                as={MdCloudQueue}
+                w="40px"
+                h="40px"
+                color={textSecondary}
+              />
+              <Text color={textSecondary} fontSize="sm">
+                No network data yet
+              </Text>
+            </Flex>
+          ) : (
+            <Chart
+              options={{
+                chart: { type: 'donut', fontFamily: 'inherit' },
+                labels: resourceTypePieChart.labels,
+                colors: [
+                  '#7C3AED',
+                  '#0D9488',
+                  '#0891B2',
+                  '#2563EB',
+                  '#EC4899',
+                  '#9CA3AF',
+                ],
+                legend: { position: 'bottom', fontSize: '12px' },
+                dataLabels: {
+                  enabled: true,
+                  formatter: (val) => `${val.toFixed(0)}%`,
+                },
+                plotOptions: {
+                  pie: {
+                    donut: {
+                      size: '55%',
+                      labels: {
+                        show: true,
+                        total: {
+                          show: true,
+                          label: 'Total',
+                          formatter: (w) =>
+                            w.globals.seriesTotals
+                              .reduce((a, b) => a + b, 0)
+                              .toString(),
+                        },
+                      },
+                    },
+                  },
+                },
+                stroke: { width: 0 },
+              }}
+              series={resourceTypePieChart.series}
+              type="donut"
               height={280}
             />
           )}
@@ -594,6 +830,20 @@ function MonitoringDashboardContent() {
             <option value="SUCCESS">Success</option>
             <option value="ERROR">Error</option>
           </Select>
+          <Select
+            maxW="160px"
+            borderRadius="12px"
+            value={resourceTypeFilter}
+            onChange={(e) => setResourceTypeFilter(e.target.value)}
+          >
+            <option value="ALL">All Types</option>
+            <option value="api">API Calls</option>
+            <option value="image">Images</option>
+            <option value="font">Fonts</option>
+            <option value="cdn">CDN</option>
+            <option value="media">Media</option>
+            <option value="other">Other</option>
+          </Select>
           <Badge
             colorScheme="brand"
             fontSize="xs"
@@ -609,12 +859,17 @@ function MonitoringDashboardContent() {
       {/* ─── Tabs: Endpoints / Live Log / Test Panel ─── */}
       <Card boxShadow={cardShadow} overflow="hidden">
         <Tabs variant="enclosed" colorScheme="brand">
-          <TabList px="20px" pt="16px" borderBottom="1px solid" borderColor={borderColor}>
+          <TabList
+            px="20px"
+            pt="16px"
+            borderBottom="1px solid"
+            borderColor={borderColor}
+          >
             <Tab fontWeight="600" fontSize="sm">
               <Icon as={MdSpeed} mr="6px" /> Endpoint Breakdown
             </Tab>
             <Tab fontWeight="600" fontSize="sm">
-              <Icon as={MdNetworkCheck} mr="6px" /> Live Request Log
+              <Icon as={MdNetworkCheck} mr="6px" /> Live Network Log
             </Tab>
             <Tab fontWeight="600" fontSize="sm">
               <Icon as={MdPlayArrow} mr="6px" /> Test API
@@ -631,12 +886,22 @@ function MonitoringDashboardContent() {
                   align="center"
                   gap="12px"
                 >
-                  <Icon as={MdApi} w="48px" h="48px" color={textSecondary} />
-                  <Text color={textSecondary} fontSize="md" fontWeight="500">
+                  <Icon
+                    as={MdApi}
+                    w="48px"
+                    h="48px"
+                    color={textSecondary}
+                  />
+                  <Text
+                    color={textSecondary}
+                    fontSize="md"
+                    fontWeight="500"
+                  >
                     No endpoint data yet
                   </Text>
                   <Text color={textSecondary} fontSize="sm">
-                    Use the "Test API" tab to fire some requests
+                    Use the "Test API" tab or browse around — images, fonts
+                    &amp; CDN loads all show up here
                   </Text>
                 </Flex>
               ) : (
@@ -647,25 +912,49 @@ function MonitoringDashboardContent() {
                         <Th color={textSecondary} borderColor={borderColor}>
                           Endpoint
                         </Th>
-                        <Th color={textSecondary} borderColor={borderColor} isNumeric>
+                        <Th color={textSecondary} borderColor={borderColor}>
+                          Type
+                        </Th>
+                        <Th
+                          color={textSecondary}
+                          borderColor={borderColor}
+                          isNumeric
+                        >
                           Calls
                         </Th>
-                        <Th color={textSecondary} borderColor={borderColor} isNumeric>
+                        <Th
+                          color={textSecondary}
+                          borderColor={borderColor}
+                          isNumeric
+                        >
                           Avg
                         </Th>
-                        <Th color={textSecondary} borderColor={borderColor} isNumeric>
+                        <Th
+                          color={textSecondary}
+                          borderColor={borderColor}
+                          isNumeric
+                        >
                           Min
                         </Th>
-                        <Th color={textSecondary} borderColor={borderColor} isNumeric>
+                        <Th
+                          color={textSecondary}
+                          borderColor={borderColor}
+                          isNumeric
+                        >
                           Max
                         </Th>
-                        <Th color={textSecondary} borderColor={borderColor} isNumeric>
-                          Total Time
+                        <Th
+                          color={textSecondary}
+                          borderColor={borderColor}
+                          isNumeric
+                        >
+                          Size
                         </Th>
-                        <Th color={textSecondary} borderColor={borderColor} isNumeric>
-                          Success
-                        </Th>
-                        <Th color={textSecondary} borderColor={borderColor} isNumeric>
+                        <Th
+                          color={textSecondary}
+                          borderColor={borderColor}
+                          isNumeric
+                        >
                           Errors
                         </Th>
                         <Th color={textSecondary} borderColor={borderColor}>
@@ -677,7 +966,10 @@ function MonitoringDashboardContent() {
                       {filteredEndpoints.map((ep, i) => {
                         const epErrorRate =
                           ep.count > 0
-                            ? ((ep.errorCount / ep.count) * 100).toFixed(0)
+                            ? (
+                                (ep.errorCount / ep.count) *
+                                100
+                              ).toFixed(0)
                             : 0;
                         const healthColor =
                           epErrorRate > 50
@@ -694,12 +986,15 @@ function MonitoringDashboardContent() {
                           >
                             <Td
                               borderColor={borderColor}
-                              maxW="300px"
+                              maxW="280px"
                               overflow="hidden"
                               textOverflow="ellipsis"
                               whiteSpace="nowrap"
                             >
-                              <Tooltip label={ep.url} placement="top-start">
+                              <Tooltip
+                                label={ep.url}
+                                placement="top-start"
+                              >
                                 <Text
                                   color={textColor}
                                   fontSize="sm"
@@ -710,8 +1005,33 @@ function MonitoringDashboardContent() {
                                 </Text>
                               </Tooltip>
                             </Td>
+                            <Td borderColor={borderColor}>
+                              <Flex gap="4px" flexWrap="wrap">
+                                {(ep.resourceTypes || []).map((rt) => {
+                                  const m =
+                                    RESOURCE_TYPE_META[rt] ||
+                                    RESOURCE_TYPE_META.other;
+                                  return (
+                                    <Tag
+                                      key={rt}
+                                      size="sm"
+                                      colorScheme={m.color}
+                                      borderRadius="full"
+                                    >
+                                      <TagLabel fontSize="xs">
+                                        {m.label}
+                                      </TagLabel>
+                                    </Tag>
+                                  );
+                                })}
+                              </Flex>
+                            </Td>
                             <Td borderColor={borderColor} isNumeric>
-                              <Tag size="sm" colorScheme="brand" borderRadius="full">
+                              <Tag
+                                size="sm"
+                                colorScheme="brand"
+                                borderRadius="full"
+                              >
                                 <TagLabel>{ep.count}</TagLabel>
                               </Tag>
                             </Td>
@@ -731,30 +1051,39 @@ function MonitoringDashboardContent() {
                               </Text>
                             </Td>
                             <Td borderColor={borderColor} isNumeric>
-                              <Text color="green.500" fontSize="sm" fontWeight="600">
+                              <Text
+                                color="green.500"
+                                fontSize="sm"
+                                fontWeight="600"
+                              >
                                 {fmtMs(ep.minDuration)}
                               </Text>
                             </Td>
                             <Td borderColor={borderColor} isNumeric>
-                              <Text color="red.400" fontSize="sm" fontWeight="600">
+                              <Text
+                                color="red.400"
+                                fontSize="sm"
+                                fontWeight="600"
+                              >
                                 {fmtMs(ep.maxDuration)}
                               </Text>
                             </Td>
                             <Td borderColor={borderColor} isNumeric>
                               <Text color={textSecondary} fontSize="sm">
-                                {fmtMs(ep.totalDuration)}
-                              </Text>
-                            </Td>
-                            <Td borderColor={borderColor} isNumeric>
-                              <Text color="green.500" fontSize="sm" fontWeight="600">
-                                {ep.successCount}
+                                {fmtBytes(ep.totalSize)}
                               </Text>
                             </Td>
                             <Td borderColor={borderColor} isNumeric>
                               <Text
-                                color={ep.errorCount > 0 ? 'red.400' : textSecondary}
+                                color={
+                                  ep.errorCount > 0
+                                    ? 'red.400'
+                                    : textSecondary
+                                }
                                 fontSize="sm"
-                                fontWeight={ep.errorCount > 0 ? '700' : '400'}
+                                fontWeight={
+                                  ep.errorCount > 0 ? '700' : '400'
+                                }
                               >
                                 {ep.errorCount}
                               </Text>
@@ -782,7 +1111,7 @@ function MonitoringDashboardContent() {
               )}
             </TabPanel>
 
-            {/* ── Live Request Log ── */}
+            {/* ── Live Network Log ── */}
             <TabPanel p="0">
               {filteredRequests.length === 0 ? (
                 <Flex
@@ -791,12 +1120,22 @@ function MonitoringDashboardContent() {
                   align="center"
                   gap="12px"
                 >
-                  <Icon as={MdNetworkCheck} w="48px" h="48px" color={textSecondary} />
-                  <Text color={textSecondary} fontSize="md" fontWeight="500">
+                  <Icon
+                    as={MdNetworkCheck}
+                    w="48px"
+                    h="48px"
+                    color={textSecondary}
+                  />
+                  <Text
+                    color={textSecondary}
+                    fontSize="md"
+                    fontWeight="500"
+                  >
                     No requests captured yet
                   </Text>
                   <Text color={textSecondary} fontSize="sm">
-                    Any fetch() or XMLHttpRequest calls will appear here in real-time
+                    All network activity (API calls, images, fonts, CDN
+                    loads) will appear here in real-time
                   </Text>
                 </Flex>
               ) : (
@@ -804,134 +1143,228 @@ function MonitoringDashboardContent() {
                   <Table variant="simple" size="sm">
                     <Thead position="sticky" top={0} bg={tableBg} zIndex={1}>
                       <Tr>
-                        <Th color={textSecondary} borderColor={borderColor}>
+                        <Th
+                          color={textSecondary}
+                          borderColor={borderColor}
+                        >
                           Time
                         </Th>
-                        <Th color={textSecondary} borderColor={borderColor}>
+                        <Th
+                          color={textSecondary}
+                          borderColor={borderColor}
+                        >
                           Method
                         </Th>
-                        <Th color={textSecondary} borderColor={borderColor}>
+                        <Th
+                          color={textSecondary}
+                          borderColor={borderColor}
+                        >
                           URL
                         </Th>
-                        <Th color={textSecondary} borderColor={borderColor} isNumeric>
+                        <Th
+                          color={textSecondary}
+                          borderColor={borderColor}
+                          isNumeric
+                        >
                           Status
                         </Th>
-                        <Th color={textSecondary} borderColor={borderColor} isNumeric>
+                        <Th
+                          color={textSecondary}
+                          borderColor={borderColor}
+                          isNumeric
+                        >
                           Duration
                         </Th>
-                        <Th color={textSecondary} borderColor={borderColor}>
+                        <Th
+                          color={textSecondary}
+                          borderColor={borderColor}
+                          isNumeric
+                        >
+                          Size
+                        </Th>
+                        <Th
+                          color={textSecondary}
+                          borderColor={borderColor}
+                        >
                           Type
                         </Th>
-                        <Th color={textSecondary} borderColor={borderColor}>
+                        <Th
+                          color={textSecondary}
+                          borderColor={borderColor}
+                        >
+                          Source
+                        </Th>
+                        <Th
+                          color={textSecondary}
+                          borderColor={borderColor}
+                        >
                           Result
                         </Th>
                       </Tr>
                     </Thead>
                     <Tbody>
-                      {filteredRequests.map((req) => (
-                        <Tr
-                          key={req.id}
-                          _hover={{ bg: hoverBg }}
-                          transition="background 0.15s"
-                          opacity={req.success ? 1 : 0.9}
-                        >
-                          <Td borderColor={borderColor} whiteSpace="nowrap">
-                            <Text color={textSecondary} fontSize="xs" fontFamily="mono">
-                              {(() => {
-                                try {
-                                  return new Date(req.timestamp).toLocaleTimeString();
-                                } catch {
-                                  return '—';
-                                }
-                              })()}
-                            </Text>
-                          </Td>
-                          <Td borderColor={borderColor}>
-                            <Badge
-                              colorScheme={
-                                req.method === 'GET'
-                                  ? 'green'
-                                  : req.method === 'POST'
-                                  ? 'blue'
-                                  : req.method === 'PUT'
-                                  ? 'orange'
-                                  : req.method === 'DELETE'
-                                  ? 'red'
-                                  : 'gray'
-                              }
-                              fontSize="xs"
-                              borderRadius="6px"
-                              px="8px"
-                            >
-                              {req.method}
-                            </Badge>
-                          </Td>
-                          <Td
-                            borderColor={borderColor}
-                            maxW="280px"
-                            overflow="hidden"
-                            textOverflow="ellipsis"
-                            whiteSpace="nowrap"
+                      {filteredRequests.map((req) => {
+                        const rtMeta =
+                          RESOURCE_TYPE_META[req.resourceType] ||
+                          RESOURCE_TYPE_META.other;
+                        return (
+                          <Tr
+                            key={req.id}
+                            _hover={{ bg: hoverBg }}
+                            transition="background 0.15s"
+                            opacity={req.success ? 1 : 0.9}
                           >
-                            <Tooltip label={req.rawUrl || req.url} placement="top-start">
+                            <Td
+                              borderColor={borderColor}
+                              whiteSpace="nowrap"
+                            >
                               <Text
-                                color={textColor}
+                                color={textSecondary}
                                 fontSize="xs"
                                 fontFamily="mono"
                               >
-                                {req.url || '—'}
+                                {(() => {
+                                  try {
+                                    return new Date(
+                                      req.timestamp
+                                    ).toLocaleTimeString();
+                                  } catch {
+                                    return '—';
+                                  }
+                                })()}
                               </Text>
-                            </Tooltip>
-                          </Td>
-                          <Td borderColor={borderColor} isNumeric>
-                            <Badge
-                              colorScheme={statusColor(req.status)}
-                              variant="subtle"
-                              fontSize="xs"
-                              borderRadius="6px"
-                              px="8px"
+                            </Td>
+                            <Td borderColor={borderColor}>
+                              <Badge
+                                colorScheme={
+                                  req.method === 'GET'
+                                    ? 'green'
+                                    : req.method === 'POST'
+                                    ? 'blue'
+                                    : req.method === 'PUT'
+                                    ? 'orange'
+                                    : req.method === 'DELETE'
+                                    ? 'red'
+                                    : 'gray'
+                                }
+                                fontSize="xs"
+                                borderRadius="6px"
+                                px="8px"
+                              >
+                                {req.method}
+                              </Badge>
+                            </Td>
+                            <Td
+                              borderColor={borderColor}
+                              maxW="260px"
+                              overflow="hidden"
+                              textOverflow="ellipsis"
+                              whiteSpace="nowrap"
                             >
-                              {req.status || 'ERR'}
-                            </Badge>
-                          </Td>
-                          <Td borderColor={borderColor} isNumeric>
-                            <Text
-                              fontWeight="700"
-                              fontSize="sm"
-                              color={
-                                req.duration > 1000
-                                  ? 'red.400'
-                                  : req.duration > 500
-                                  ? 'orange.400'
-                                  : 'green.500'
-                              }
-                            >
-                              {fmtMs(req.duration)}
-                            </Text>
-                          </Td>
-                          <Td borderColor={borderColor}>
-                            <Tag
-                              size="sm"
-                              variant="outline"
-                              colorScheme={req.type === 'fetch' ? 'purple' : 'cyan'}
-                              borderRadius="full"
-                            >
-                              <TagLabel fontSize="xs">{req.type}</TagLabel>
-                            </Tag>
-                          </Td>
-                          <Td borderColor={borderColor}>
-                            {req.success ? (
-                              <Icon as={MdCheckCircle} color="green.400" w="18px" h="18px" />
-                            ) : (
-                              <Tooltip label={req.error || `HTTP ${req.status}`}>
-                                <span>
-                                  <Icon as={MdWarning} color="red.400" w="18px" h="18px" />
-                                </span>
+                              <Tooltip
+                                label={req.rawUrl || req.url}
+                                placement="top-start"
+                              >
+                                <Text
+                                  color={textColor}
+                                  fontSize="xs"
+                                  fontFamily="mono"
+                                >
+                                  {req.url || '—'}
+                                </Text>
                               </Tooltip>
-                            )}
-                          </Td>
-                        </Tr>
-                      ))}
+                            </Td>
+                            <Td borderColor={borderColor} isNumeric>
+                              <Badge
+                                colorScheme={statusColor(req.status)}
+                                variant="subtle"
+                                fontSize="xs"
+                                borderRadius="6px"
+                                px="8px"
+                              >
+                                {req.status || 'ERR'}
+                              </Badge>
+                            </Td>
+                            <Td borderColor={borderColor} isNumeric>
+                              <Text
+                                fontWeight="700"
+                                fontSize="sm"
+                                color={
+                                  req.duration > 1000
+                                    ? 'red.400'
+                                    : req.duration > 500
+                                    ? 'orange.400'
+                                    : 'green.500'
+                                }
+                              >
+                                {fmtMs(req.duration)}
+                              </Text>
+                            </Td>
+                            <Td borderColor={borderColor} isNumeric>
+                              <Text
+                                color={textSecondary}
+                                fontSize="xs"
+                              >
+                                {fmtBytes(req.size)}
+                              </Text>
+                            </Td>
+                            <Td borderColor={borderColor}>
+                              <Tag
+                                size="sm"
+                                colorScheme={rtMeta.color}
+                                borderRadius="full"
+                              >
+                                <TagLabel fontSize="xs">
+                                  {rtMeta.label}
+                                </TagLabel>
+                              </Tag>
+                            </Td>
+                            <Td borderColor={borderColor}>
+                              <Tag
+                                size="sm"
+                                variant="outline"
+                                colorScheme={
+                                  req.type === 'fetch'
+                                    ? 'purple'
+                                    : req.type === 'xhr'
+                                    ? 'cyan'
+                                    : 'orange'
+                                }
+                                borderRadius="full"
+                              >
+                                <TagLabel fontSize="xs">
+                                  {req.type}
+                                </TagLabel>
+                              </Tag>
+                            </Td>
+                            <Td borderColor={borderColor}>
+                              {req.success ? (
+                                <Icon
+                                  as={MdCheckCircle}
+                                  color="green.400"
+                                  w="18px"
+                                  h="18px"
+                                />
+                              ) : (
+                                <Tooltip
+                                  label={
+                                    req.error || `HTTP ${req.status}`
+                                  }
+                                >
+                                  <span>
+                                    <Icon
+                                      as={MdWarning}
+                                      color="red.400"
+                                      w="18px"
+                                      h="18px"
+                                    />
+                                  </span>
+                                </Tooltip>
+                              )}
+                            </Td>
+                          </Tr>
+                        );
+                      })}
                     </Tbody>
                   </Table>
                 </Box>
@@ -944,8 +1377,9 @@ function MonitoringDashboardContent() {
                 Send a Test Request
               </Text>
               <Text color={textSecondary} fontSize="sm" mb="20px">
-                Fire real HTTP requests to any URL. The interceptor will capture timing 
-                metrics automatically.
+                Fire real HTTP requests to any URL. The interceptor will
+                capture timing metrics automatically. Images, CDN and font
+                loads from page navigation are also tracked.
               </Text>
 
               <Flex gap="12px" mb="16px" flexWrap="wrap">
@@ -972,7 +1406,9 @@ function MonitoringDashboardContent() {
                   fontSize="sm"
                 />
                 <Button
-                  leftIcon={isTesting ? <Spinner size="xs" /> : <MdPlayArrow />}
+                  leftIcon={
+                    isTesting ? <Spinner size="xs" /> : <MdPlayArrow />
+                  }
                   colorScheme="brand"
                   borderRadius="12px"
                   onClick={fireTestRequest}
@@ -992,19 +1428,49 @@ function MonitoringDashboardContent() {
               )}
 
               {/* Quick test buttons */}
-              <Text color={textSecondary} fontSize="xs" fontWeight="600" mb="8px" textTransform="uppercase">
-                Quick Tests
+              <Text
+                color={textSecondary}
+                fontSize="xs"
+                fontWeight="600"
+                mb="8px"
+                textTransform="uppercase"
+              >
+                Quick Tests — APIs
               </Text>
-              <Flex gap="8px" flexWrap="wrap">
+              <Flex gap="8px" flexWrap="wrap" mb="16px">
                 {[
-                  { label: 'JSON Placeholder', url: 'https://jsonplaceholder.typicode.com/posts/1' },
-                  { label: 'Random User', url: 'https://randomuser.me/api/' },
-                  { label: 'HTTPBin Get', url: 'https://httpbin.org/get' },
-                  { label: 'HTTPBin Delay 1s', url: 'https://httpbin.org/delay/1' },
-                  { label: 'HTTPBin Delay 3s', url: 'https://httpbin.org/delay/3' },
-                  { label: '404 Test', url: 'https://httpbin.org/status/404' },
-                  { label: '500 Test', url: 'https://httpbin.org/status/500' },
-                  { label: 'Invalid URL', url: 'https://this-domain-does-not-exist-12345.com/api' },
+                  {
+                    label: 'JSON Placeholder',
+                    url: 'https://jsonplaceholder.typicode.com/posts/1',
+                  },
+                  {
+                    label: 'Random User',
+                    url: 'https://randomuser.me/api/',
+                  },
+                  {
+                    label: 'HTTPBin Get',
+                    url: 'https://httpbin.org/get',
+                  },
+                  {
+                    label: 'HTTPBin Delay 1s',
+                    url: 'https://httpbin.org/delay/1',
+                  },
+                  {
+                    label: 'HTTPBin Delay 3s',
+                    url: 'https://httpbin.org/delay/3',
+                  },
+                  {
+                    label: '404 Test',
+                    url: 'https://httpbin.org/status/404',
+                  },
+                  {
+                    label: '500 Test',
+                    url: 'https://httpbin.org/status/500',
+                  },
+                  {
+                    label: 'Invalid URL',
+                    url: 'https://this-domain-does-not-exist-12345.com/api',
+                  },
                 ].map((t) => (
                   <Button
                     key={t.url}
@@ -1028,8 +1494,59 @@ function MonitoringDashboardContent() {
                 ))}
               </Flex>
 
+              {/* Quick test — images & CDN */}
+              <Text
+                color={textSecondary}
+                fontSize="xs"
+                fontWeight="600"
+                mb="8px"
+                textTransform="uppercase"
+              >
+                Quick Tests — Images &amp; CDN
+              </Text>
+              <Flex gap="8px" flexWrap="wrap" mb="16px">
+                {[
+                  {
+                    label: 'Picsum Photo',
+                    url: 'https://picsum.photos/200/200',
+                  },
+                  {
+                    label: 'Placeholder Image',
+                    url: 'https://via.placeholder.com/150',
+                  },
+                  {
+                    label: 'CDN jQuery',
+                    url: 'https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js',
+                  },
+                  {
+                    label: 'Google Font CSS',
+                    url: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;700',
+                  },
+                ].map((t) => (
+                  <Button
+                    key={t.url}
+                    size="sm"
+                    variant="outline"
+                    borderRadius="full"
+                    fontSize="xs"
+                    colorScheme="teal"
+                    onClick={() => {
+                      setTestUrl(t.url);
+                      setTestMethod('GET');
+                    }}
+                    _hover={{
+                      bg: 'teal.500',
+                      color: 'white',
+                    }}
+                    transition="all 0.2s"
+                  >
+                    {t.label}
+                  </Button>
+                ))}
+              </Flex>
+
               {/* Batch fire */}
-              <Flex mt="20px" gap="12px" align="center">
+              <Flex mt="8px" gap="12px" align="center">
                 <Button
                   leftIcon={<MdRefresh />}
                   size="sm"
@@ -1053,7 +1570,7 @@ function MonitoringDashboardContent() {
                     }
                   }}
                 >
-                  Fire 5 Requests
+                  Fire 5 API Requests
                 </Button>
                 <Text color={textSecondary} fontSize="xs">
                   Quickly populate data with multiple API calls
